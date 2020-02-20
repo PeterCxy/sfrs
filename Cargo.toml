@@ -1,0 +1,14 @@
+[package]
+name = "sfrs"
+version = "0.1.0"
+authors = ["Peter Cai <peter@typeblog.net>"]
+edition = "2018"
+
+[dependencies]
+rocket = "0.4.2"
+rocket_contrib = { version = "0.4.2", features = ["diesel_sqlite_pool"] }
+jwt = "0.4.0"
+diesel = { version = "1.4.3", features = ["sqlite"] }
+diesel_migrations = "1.4.0"
+dotenv = "0.9.0"
+serde = { version = "1.0.104", features = ["derive"] }
