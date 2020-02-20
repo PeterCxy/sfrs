@@ -7,7 +7,10 @@ use serde::Serialize;
 use std::vec::Vec;
 
 pub fn routes() -> impl Into<Vec<rocket::Route>> {
-    routes![auth]
+    routes![
+        auth,
+        auth_params
+    ]
 }
 
 #[derive(Serialize)]
@@ -43,6 +46,32 @@ fn auth(db: DbConn, new_user: Json<user::NewUser>) -> Custom<JsonResp<AuthResult
         Ok(_) => success_resp(AuthResult {
             token: "aaaa".to_string()
         }),
+        Err(user::UserOpError(e)) =>
+            error_resp(Status::InternalServerError, vec![e])
+    }
+}
+
+#[derive(Serialize)]
+struct AuthParams {
+    pw_cost: String,
+    pw_nonce: String,
+    version: String
+}
+
+impl Into<AuthParams> for user::User {
+    fn into(self) -> AuthParams {
+        AuthParams {
+            pw_cost: self.pw_cost,
+            pw_nonce: self.pw_nonce,
+            version: self.version
+        }
+    }
+}
+
+#[get("/auth/params?<email>")]
+fn auth_params(db: DbConn, email: String) -> Custom<JsonResp<AuthParams>> {
+    match user::User::find_user_by_email(&db, &email) {
+        Ok(u) => success_resp(u.into()),
         Err(user::UserOpError(e)) =>
             error_resp(Status::InternalServerError, vec![e])
     }
