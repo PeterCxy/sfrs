@@ -11,6 +11,7 @@ extern crate diesel_migrations;
 extern crate dotenv;
 #[macro_use]
 extern crate serde;
+extern crate crypto;
 
 mod schema;
 mod api;

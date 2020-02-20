@@ -3,12 +3,13 @@ use crate::user;
 use rocket::http::Status;
 use rocket::response::status::Custom;
 use rocket_contrib::json::Json;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use std::vec::Vec;
 
 pub fn routes() -> impl Into<Vec<rocket::Route>> {
     routes![
         auth,
+        auth_sign_in,
         auth_params
     ]
 }
@@ -43,8 +44,31 @@ struct AuthResult {
 #[post("/auth", format = "json", data = "<new_user>")]
 fn auth(db: DbConn, new_user: Json<user::NewUser>) -> Custom<JsonResp<AuthResult>> {
     match user::User::create(&db.0, &new_user) {
-        Ok(_) => success_resp(AuthResult {
-            token: "aaaa".to_string()
+        Ok(_) => _sign_in(db, &new_user.email, &new_user.password),
+        Err(user::UserOpError(e)) =>
+            error_resp(Status::InternalServerError, vec![e])
+    }
+}
+
+#[derive(Deserialize)]
+struct SignInParams {
+    email: String,
+    password: String
+}
+
+#[post("/auth/sign_in", format = "json", data = "<params>")]
+fn auth_sign_in(db: DbConn, params: Json<SignInParams>) -> Custom<JsonResp<AuthResult>> {
+    _sign_in(db, &params.email, &params.password)
+}
+
+// Shared logic for all interfaces that needs to do an automatic sign-in
+fn _sign_in(db: DbConn, mail: &str, passwd: &str) -> Custom<JsonResp<AuthResult>> {
+    // Try to find the user first
+    let res = user::User::find_user_by_email(&db, mail)
+                .and_then(|u| u.create_token(passwd));
+    match res {
+        Ok(token) => success_resp(AuthResult {
+            token
         }),
         Err(user::UserOpError(e)) =>
             error_resp(Status::InternalServerError, vec![e])

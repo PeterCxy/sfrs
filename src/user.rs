@@ -3,6 +3,8 @@ use crate::schema::users::dsl::*;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use serde::Deserialize;
+use std::env;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug)]
 pub struct UserOpError(pub String);
@@ -54,6 +56,30 @@ impl User {
             Result::Err(UserOpError::new("No matching user found"))
         } else {
             Result::Ok(results.remove(0)) // Take ownership, kill the stupid Vec
+        }
+    }
+
+    // Create a JWT token for the current user if password matches
+    pub fn create_token(&self, passwd: &str) -> Result<String, UserOpError> {
+        if passwd != self.password {
+            Err(UserOpError::new("Password mismatch"))
+        } else {
+            jwt::Token::new(
+                jwt::Header::default(),
+                jwt::Claims::new(jwt::Registered {
+                    iss: None,
+                    sub: Some(self.email.clone()),
+                    exp: None,
+                    aud: None,
+                    nbf: Some(SystemTime::now().duration_since(UNIX_EPOCH)
+                            .expect("wtf????").as_secs()),
+                    iat: None,
+                    jti: None
+                })
+            ).signed(env::var("SFRS_JWT_SECRET")
+                .expect("Please have SFRS_JWT_SECRET set")
+                .as_bytes(), crypto::sha2::Sha256::new())
+             .map_err(|_| UserOpError::new("Failed to generate token"))
         }
     }
 }
