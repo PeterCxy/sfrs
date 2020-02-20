@@ -15,11 +15,68 @@ impl UserOpError {
     }
 }
 
-#[derive(Queryable, Debug)]
-pub struct User {
+// Password should ALWAYS be hashed
+#[derive(Debug)]
+pub struct Password(String);
+
+impl Password {
+    fn new(passwd: &str) -> Password {
+        let params = scrypt::ScryptParams::new(11, 8, 1).unwrap();
+        Password(scrypt::scrypt_simple(passwd, &params).unwrap())
+    }
+}
+
+impl PartialEq<&str> for Password {
+    fn eq(&self, other: &&str) -> bool {
+        scrypt::scrypt_check(*other, &self.0).is_ok()
+    }
+}
+
+impl Into<Password> for String {
+    fn into(self) -> Password {
+        Password::new(&self)
+    }
+}
+
+// Convert itself to a hash String for db operations
+impl Into<String> for Password {
+    fn into(self) -> String {
+        self.0
+    }
+}
+
+// A raw User returned from database
+// we need to wrap the password in the Password type
+#[derive(Queryable)]
+struct UserQuery {
     pub id: i32,
     pub email: String,
     pub password: String,
+    pub pw_cost: String,
+    pub pw_nonce: String,
+    pub version: String
+}
+
+impl Into<User> for UserQuery {
+    fn into(self) -> User {
+        User {
+            id: self.id,
+            email: self.email,
+            // We can directly construct Password here
+            // because it's already the hashed value from db
+            password: Password(self.password),
+            pw_cost: self.pw_cost,
+            pw_nonce: self.pw_nonce,
+            version: self.version
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct User {
+    pub id: i32,
+    pub email: String,
+    pub password: Password,
     pub pw_cost: String,
     pub pw_nonce: String,
     pub version: String
@@ -37,10 +94,18 @@ pub struct NewUser {
 
 impl User {
     pub fn create(db: &SqliteConnection, new_user: &NewUser) -> Result<(), UserOpError> {
+        let user_hashed = NewUser {
+            email: new_user.email.clone(),
+            password: Password::new(&new_user.password).into(),
+            pw_cost: new_user.pw_cost.clone(),
+            pw_nonce: new_user.pw_nonce.clone(),
+            version: new_user.version.clone()
+        };
+
         match Self::find_user_by_email(db, &new_user.email) {
             Ok(_) => Err(UserOpError::new("User already registered")),
             Err(_) => diesel::insert_into(users::table)
-                        .values(new_user)
+                        .values(user_hashed)
                         .execute(db)
                         .map(|_| ())
                         .map_err(|_| UserOpError::new("Database error"))
@@ -50,18 +115,18 @@ impl User {
     pub fn find_user_by_email(db: &SqliteConnection, user_email: &str) -> Result<User, UserOpError> {
         let mut results = users.filter(email.eq(user_email))
             .limit(1)
-            .load::<User>(db)
+            .load::<UserQuery>(db)
             .map_err(|_| UserOpError::new("Database error"))?;
         if results.is_empty() {
             Result::Err(UserOpError::new("No matching user found"))
         } else {
-            Result::Ok(results.remove(0)) // Take ownership, kill the stupid Vec
+            Result::Ok(results.remove(0).into()) // Take ownership, kill the stupid Vec
         }
     }
 
     // Create a JWT token for the current user if password matches
     pub fn create_token(&self, passwd: &str) -> Result<String, UserOpError> {
-        if passwd != self.password {
+        if self.password != passwd {
             Err(UserOpError::new("Password mismatch"))
         } else {
             jwt::Token::new(
@@ -86,14 +151,14 @@ impl User {
     // Change the password in database, if old password is provided
     // The current instance of User model will not be mutated
     pub fn change_pw(&self, db: &SqliteConnection, passwd: &str, new_passwd: &str) -> Result<(), UserOpError> {
-        if passwd != self.password {
+        if self.password != passwd {
             Err(UserOpError::new("Password mismatch"))
         } else {
             // Update database
             // TODO: Maybe we should revoke all JWTs somehow?
             //      maybe we can record when the user last changed?
             diesel::update(users.find(self.id))
-                .set(password.eq(new_passwd))
+                .set(password.eq::<String>(Password::new(new_passwd).into()))
                 .execute(db)
                 .map(|_| ())
                 .map_err(|_| UserOpError::new("Database error"))

@@ -12,6 +12,7 @@ extern crate dotenv;
 #[macro_use]
 extern crate serde;
 extern crate crypto;
+extern crate scrypt;
 
 mod schema;
 mod api;
