@@ -71,9 +71,9 @@ impl User {
                     sub: Some(self.email.clone()),
                     exp: None,
                     aud: None,
-                    nbf: Some(SystemTime::now().duration_since(UNIX_EPOCH)
+                    iat: Some(SystemTime::now().duration_since(UNIX_EPOCH)
                             .expect("wtf????").as_secs()),
-                    iat: None,
+                    nbf: None,
                     jti: None
                 })
             ).signed(env::var("SFRS_JWT_SECRET")
