@@ -9,6 +9,7 @@ use std::vec::Vec;
 pub fn routes() -> impl Into<Vec<rocket::Route>> {
     routes![
         auth,
+        auth_change_pw,
         auth_sign_in,
         auth_params
     ]
@@ -96,6 +97,25 @@ impl Into<AuthParams> for user::User {
 fn auth_params(db: DbConn, email: String) -> Custom<JsonResp<AuthParams>> {
     match user::User::find_user_by_email(&db, &email) {
         Ok(u) => success_resp(u.into()),
+        Err(user::UserOpError(e)) =>
+            error_resp(Status::InternalServerError, vec![e])
+    }
+}
+
+#[derive(Deserialize)]
+struct ChangePwParams {
+    email: String,
+    password: String,
+    current_password: String
+}
+
+#[post("/auth/change_pw", format = "json", data = "<params>")]
+fn auth_change_pw(db: DbConn, params: Json<ChangePwParams>) -> Custom<JsonResp<()>> {
+    let res = user::User::find_user_by_email(&db, &params.email)
+                .and_then(|u|
+                    u.change_pw(&db, &params.current_password, &params.password));
+    match res {
+        Ok(_) => Custom(Status::NoContent, Json(Response::Success(()))),
         Err(user::UserOpError(e)) =>
             error_resp(Status::InternalServerError, vec![e])
     }

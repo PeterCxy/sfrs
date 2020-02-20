@@ -82,4 +82,21 @@ impl User {
              .map_err(|_| UserOpError::new("Failed to generate token"))
         }
     }
+
+    // Change the password in database, if old password is provided
+    // The current instance of User model will not be mutated
+    pub fn change_pw(&self, db: &SqliteConnection, passwd: &str, new_passwd: &str) -> Result<(), UserOpError> {
+        if passwd != self.password {
+            Err(UserOpError::new("Password mismatch"))
+        } else {
+            // Update database
+            // TODO: Maybe we should revoke all JWTs somehow?
+            //      maybe we can record when the user last changed?
+            diesel::update(users.find(self.id))
+                .set(password.eq(new_passwd))
+                .execute(db)
+                .map(|_| ())
+                .map_err(|_| UserOpError::new("Database error"))
+        }
+    }
 }
