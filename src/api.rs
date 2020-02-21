@@ -172,7 +172,12 @@ fn items_sync(db: DbConn, u: user::User, params: Json<SyncParams>) -> Custom<Jso
     let inner_params = params.into_inner();
 
     // First, update all items sent by client
-    for it in inner_params.items.into_iter() {
+    for mut it in inner_params.items.into_iter() {
+        let old_updated_at = it.updated_at.clone();
+        // Always update updated_at for all items on server
+        it.updated_at = 
+            Some(chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+
         if let Err(item::ItemOpError(_)) = item::SyncItem::items_insert(&db, &u, &it) {
             // Well, we should try twice...
             // TODO: make this more elegant (also handle differneces between db error and conflict)
@@ -181,6 +186,7 @@ fn items_sync(db: DbConn, u: user::User, params: Json<SyncParams>) -> Custom<Jso
                 // Let's not fail just because one of them...
                 // At least the client will know there's an error
                 // (maybe mistakes it for conflict)
+                it.updated_at = old_updated_at;
                 resp.unsaved.push(it);
             }
         } else {
