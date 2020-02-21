@@ -81,7 +81,7 @@ fn _sign_in(db: DbConn, mail: &str, passwd: &str) -> Custom<JsonResp<AuthResult>
 
 #[derive(Serialize)]
 struct AuthParams {
-    pw_cost: String,
+    pw_cost: i32,
     pw_nonce: String,
     version: String
 }

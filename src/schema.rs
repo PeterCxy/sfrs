@@ -17,7 +17,7 @@ table! {
         id -> Integer,
         email -> Text,
         password -> Text,
-        pw_cost -> Text,
+        pw_cost -> Integer,
         pw_nonce -> Text,
         version -> Text,
     }

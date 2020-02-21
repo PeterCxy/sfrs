@@ -66,7 +66,7 @@ struct UserQuery {
     pub id: i32,
     pub email: String,
     pub password: String,
-    pub pw_cost: String,
+    pub pw_cost: i32,
     pub pw_nonce: String,
     pub version: String
 }
@@ -91,7 +91,7 @@ pub struct User {
     pub id: i32,
     pub email: String,
     pub password: Password,
-    pub pw_cost: String,
+    pub pw_cost: i32,
     pub pw_nonce: String,
     pub version: String
 }
@@ -101,7 +101,7 @@ pub struct User {
 pub struct NewUser {
     pub email: String,
     pub password: String,
-    pub pw_cost: String,
+    pub pw_cost: i32,
     pub pw_nonce: String,
     pub version: String
 }
