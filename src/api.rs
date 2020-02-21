@@ -225,14 +225,11 @@ fn items_sync(db: DbConn, u: user::User, params: Json<SyncParams>) -> Custom<Jso
         },
         Ok(items) => {
             if !items.is_empty() {
-                // If we fetched something
-                // we should record the current last id to *some* token
-                // this may be `cursor_token` or `sync_token`
-                // if we have more to fetch, we set `cursor_token` to this id
-                //    so that the client knows to continue
-                // and we set `sync_token` to this id regardless, for the
-                //    client to remember where we were even if
-                //    it doesn't need to continue
+                // If we fetched something, and the length is right at limit
+                // we may have more to fetch. In this case, we need to
+                // inform the client to continue fetching, until there is
+                // nothing more to fetch
+                // (i.e. until cursor_token is equal to sync_token)
                 let next_from = items.last().unwrap().id;
                 if let Some(limit) = inner_params.limit {
                     if items.len() as i64 == limit {
@@ -265,6 +262,10 @@ fn items_sync(db: DbConn, u: user::User, params: Json<SyncParams>) -> Custom<Jso
     let mut last_id: i64 = -1;
     for mut it in inner_params.items.into_iter() {
         // Handle conflicts 
+        // Anything that we just retrieved but need to save immediately
+        // is potentially a conflict
+        // TODO: how do we handle this when the sync needs multiple requests
+        //   to finish?
         let mut conflicted = false;
         for y in resp.retrieved_items.iter() {
             if it.uuid == y.uuid {
@@ -310,6 +311,10 @@ fn items_sync(db: DbConn, u: user::User, params: Json<SyncParams>) -> Custom<Jso
 
     if last_id > -1 {
         // Update sync_token to the latest one of our saved items
+        // This is ALWAYS the case. `sync_token` indicates the
+        // LATEST known state of the system by the client,
+        // but it MAY still need to fill in a bit of history
+        // (that's where `cursor_token` comes into play)
         resp.sync_token = Some(last_id.to_string());
     }
 
