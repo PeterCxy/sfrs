@@ -7,8 +7,8 @@ table! {
         content_type -> Text,
         enc_item_key -> Nullable<Text>,
         deleted -> Bool,
-        created_at -> Timestamp,
-        updated_at -> Nullable<Timestamp>,
+        created_at -> Text,
+        updated_at -> Nullable<Text>,
     }
 }
 

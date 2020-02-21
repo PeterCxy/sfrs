@@ -2,7 +2,6 @@ use crate::schema::items;
 use crate::schema::items::dsl::*;
 use crate::{lock_db_write, lock_db_read};
 use crate::user;
-use chrono::naive::NaiveDateTime;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use serde::{Serialize, Deserialize};
@@ -32,8 +31,8 @@ pub struct Item {
     pub content_type: String,
     pub enc_item_key: Option<String>,
     pub deleted: bool,
-    pub created_at: NaiveDateTime,
-    pub updated_at: Option<NaiveDateTime>
+    pub created_at: String,
+    pub updated_at: Option<String>
 }
 
 #[derive(Insertable)]
@@ -45,8 +44,8 @@ struct InsertItem {
     content_type: String,
     enc_item_key: Option<String>,
     deleted: bool,
-    created_at: NaiveDateTime,
-    updated_at: Option<NaiveDateTime>
+    created_at: String,
+    updated_at: Option<String>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -55,9 +54,10 @@ pub struct SyncItem {
     pub content: Option<String>,
     pub content_type: String,
     pub enc_item_key: Option<String>,
+    #[serde(default)]
     pub deleted: bool,
-    pub created_at: NaiveDateTime,
-    pub updated_at: Option<NaiveDateTime>
+    pub created_at: String,
+    pub updated_at: Option<String>
 }
 
 impl Into<SyncItem> for Item {
@@ -129,8 +129,8 @@ impl SyncItem {
                 content_type: it.content_type.clone(),
                 enc_item_key: if it.deleted { None } else { it.enc_item_key.clone() },
                 deleted: it.deleted,
-                created_at: it.created_at,
-                updated_at: it.updated_at
+                created_at: it.created_at.clone(),
+                updated_at: it.updated_at.clone()
             })
             .execute(db)
             .map(|_| ())

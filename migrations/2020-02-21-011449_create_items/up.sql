@@ -6,8 +6,8 @@ CREATE TABLE items (
     content_type VARCHAR NOT NULL,
     enc_item_key VARCHAR,
     deleted BOOLEAN NOT NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME,
+    created_at VARCHAR NOT NULL,
+    updated_at VARCHAR,
     FOREIGN KEY (owner)
         REFERENCES users (id)
 )
