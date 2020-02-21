@@ -192,6 +192,7 @@ fn items_sync(db: DbConn, u: user::User, params: Json<SyncParams>) -> Custom<Jso
     let inner_params = params.into_inner();
 
     let mut from_id: Option<i64> = None;
+    let mut max_id: Option<i64> = None;
     let mut had_cursor = false;
 
     if let Some(cursor_token) = inner_params.cursor_token {
@@ -200,15 +201,23 @@ fn items_sync(db: DbConn, u: user::User, params: Json<SyncParams>) -> Custom<Jso
         // until sync_token (the head of the last sync)
         from_id = cursor_token.parse().ok();
         had_cursor = true;
-    } else if let Some(sync_token) = inner_params.sync_token.clone() {
-        // If there is no cursor_token, then we are doing
-        // a normal sync, so just return all records from sync_token
-        from_id = sync_token.parse().ok();
+    }
+    
+    if let Some(sync_token) = inner_params.sync_token.clone() {
+        if !had_cursor {
+            // If there is no cursor_token, then we are doing
+            // a normal sync, so just return all records from sync_token
+            from_id = sync_token.parse().ok();
+        } else {
+            // When we have both a cursor_token and a sync_token,
+            // we need to always make sure we don't go *beyond* sync_token
+            max_id = sync_token.parse().ok();
+        }
     }
 
     // First, retrieve what the client needs
     let result = item::SyncItem::items_of_user(&db, &u,
-        from_id, None, inner_params.limit);
+        from_id, max_id, inner_params.limit);
 
     match result {
         Err(item::ItemOpError(e)) => {
