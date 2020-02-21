@@ -165,8 +165,8 @@ fn items_sync(db: DbConn, u: user::User, params: Json<SyncParams>) -> Custom<Jso
         retrieved_items: vec![],
         saved_items: vec![],
         unsaved: vec![],
-        sync_token: None,
-        cursor_token: None
+        sync_token: params.sync_token.clone(),
+        cursor_token: params.cursor_token.clone()
     };
 
     let inner_params = params.into_inner();
