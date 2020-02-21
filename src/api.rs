@@ -41,7 +41,14 @@ fn error_resp<T: Serialize>(status: Status, errors: Vec<String>) -> Custom<JsonR
 }
 
 #[derive(Serialize)]
+struct AuthResultUser {
+    email: String,
+    uuid: String
+}
+
+#[derive(Serialize)]
 struct AuthResult {
+    user: AuthResultUser,
     token: String
 }
 
@@ -69,9 +76,14 @@ fn auth_sign_in(db: DbConn, params: Json<SignInParams>) -> Custom<JsonResp<AuthR
 fn _sign_in(db: DbConn, mail: &str, passwd: &str) -> Custom<JsonResp<AuthResult>> {
     // Try to find the user first
     let res = user::User::find_user_by_email(&db, mail)
-                .and_then(|u| u.create_token(passwd));
+                .and_then(|u| u.create_token(passwd)
+                                .map(|x| (u.uuid, u.email, x)));
     match res {
-        Ok(token) => success_resp(AuthResult {
+        Ok((uuid, email, token)) => success_resp(AuthResult {
+            user: AuthResultUser {
+                uuid,
+                email
+            },
             token
         }),
         Err(user::UserOpError(e)) =>

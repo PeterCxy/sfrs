@@ -15,6 +15,7 @@ table! {
 table! {
     users (id) {
         id -> Integer,
+        uuid -> Text,
         email -> Text,
         password -> Text,
         pw_cost -> Integer,

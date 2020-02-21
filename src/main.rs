@@ -16,6 +16,7 @@ extern crate crypto;
 extern crate scrypt;
 #[macro_use]
 extern crate lazy_static;
+extern crate uuid;
 
 mod schema;
 mod api;

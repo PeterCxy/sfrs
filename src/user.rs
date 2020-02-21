@@ -1,6 +1,7 @@
 use crate::schema::users;
 use crate::schema::users::dsl::*;
 use crate::{lock_db_write, lock_db_read};
+use crate::uuid::Uuid;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use rocket::request;
@@ -64,6 +65,7 @@ impl Into<String> for Password {
 #[derive(Queryable)]
 struct UserQuery {
     pub id: i32,
+    pub uuid: String,
     pub email: String,
     pub password: String,
     pub pw_cost: i32,
@@ -75,6 +77,7 @@ impl Into<User> for UserQuery {
     fn into(self) -> User {
         User {
             id: self.id,
+            uuid: self.uuid,
             email: self.email,
             // We can directly construct Password here
             // because it's already the hashed value from db
@@ -89,6 +92,7 @@ impl Into<User> for UserQuery {
 #[derive(Debug)]
 pub struct User {
     pub id: i32,
+    pub uuid: String,
     pub email: String,
     pub password: Password,
     pub pw_cost: i32,
@@ -96,8 +100,7 @@ pub struct User {
     pub version: String
 }
 
-#[derive(Insertable, Deserialize)]
-#[table_name="users"]
+#[derive(Deserialize)]
 pub struct NewUser {
     pub email: String,
     pub password: String,
@@ -106,14 +109,27 @@ pub struct NewUser {
     pub version: String
 }
 
+#[derive(Insertable)]
+#[table_name="users"]
+struct NewUserInsert {
+    uuid: String,
+    email: String,
+    password: String,
+    pw_cost: i32,
+    pw_nonce: String,
+    version: String
+}
+
 impl User {
-    pub fn create(db: &SqliteConnection, new_user: &NewUser) -> Result<(), UserOpError> {
-        let user_hashed = NewUser {
+    pub fn create(db: &SqliteConnection, new_user: &NewUser) -> Result<String, UserOpError> {
+        let uid = Uuid::new_v4().to_hyphenated().to_string();
+        let user_hashed = NewUserInsert {
+            uuid: uid.clone(),
             email: new_user.email.clone(),
             password: Password::new(&new_user.password).into(),
             pw_cost: new_user.pw_cost.clone(),
             pw_nonce: new_user.pw_nonce.clone(),
-            version: new_user.version.clone()
+            version: new_user.version.clone(),
         };
 
         match Self::find_user_by_email(db, &new_user.email) {
@@ -122,7 +138,7 @@ impl User {
                         .and_then(|_| diesel::insert_into(users::table)
                             .values(user_hashed)
                             .execute(db)
-                            .map(|_| ())
+                            .map(|_| uid)
                             .map_err(|_| UserOpError::new("Database error")))
         }
     }
