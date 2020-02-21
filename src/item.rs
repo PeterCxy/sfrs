@@ -120,7 +120,6 @@ impl SyncItem {
                     .load::<Item>(db)
                     .map_err(|_| "Database error".into())
             })?;
-        // TODO: Detect sync conflict? similar to the Go version.
 
         let _lock = lock_db_write!()?;
         if !orig.is_empty() {
