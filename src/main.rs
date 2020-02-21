@@ -12,7 +12,7 @@ extern crate diesel_migrations;
 extern crate dotenv;
 #[macro_use]
 extern crate serde;
-extern crate crypto;
+extern crate serde_json;
 extern crate scrypt;
 #[macro_use]
 extern crate lazy_static;
@@ -20,6 +20,7 @@ extern crate uuid;
 
 mod schema;
 mod api;
+mod tokens;
 mod user;
 mod item;
 

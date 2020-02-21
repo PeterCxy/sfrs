@@ -1,0 +1,7 @@
+CREATE TABLE tokens (
+    id VARCHAR PRIMARY KEY NOT NULL,
+    uid INTEGER NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (uid)
+        REFERENCES users (id)
+)

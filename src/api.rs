@@ -76,7 +76,7 @@ fn auth_sign_in(db: DbConn, params: Json<SignInParams>) -> Custom<JsonResp<AuthR
 fn _sign_in(db: DbConn, mail: &str, passwd: &str) -> Custom<JsonResp<AuthResult>> {
     // Try to find the user first
     let res = user::User::find_user_by_email(&db, mail)
-                .and_then(|u| u.create_token(passwd)
+                .and_then(|u| u.create_token(&db, passwd)
                                 .map(|x| (u.uuid, u.email, x)));
     match res {
         Ok((uuid, email, token)) => success_resp(AuthResult {

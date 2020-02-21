@@ -13,6 +13,14 @@ table! {
 }
 
 table! {
+    tokens (id) {
+        id -> Text,
+        uid -> Integer,
+        timestamp -> Nullable<Timestamp>,
+    }
+}
+
+table! {
     users (id) {
         id -> Integer,
         uuid -> Text,
@@ -25,8 +33,10 @@ table! {
 }
 
 joinable!(items -> users (owner));
+joinable!(tokens -> users (uid));
 
 allow_tables_to_appear_in_same_query!(
     items,
+    tokens,
     users,
 );

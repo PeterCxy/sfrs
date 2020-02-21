@@ -7,13 +7,6 @@ use diesel::sqlite::SqliteConnection;
 use rocket::request;
 use rocket::http::Status;
 use serde::Deserialize;
-use std::env;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-lazy_static! {
-    static ref JWT_SECRET: String = env::var("SFRS_JWT_SECRET")
-        .expect("Please have SFRS_JWT_SECRET set");
-}
 
 #[derive(Debug)]
 pub struct UserOpError(pub String);
@@ -156,37 +149,32 @@ impl User {
         }
     }
 
-    pub fn find_user_by_token(db: &SqliteConnection, token: &str) -> Result<User, UserOpError> {
-        let parsed: jwt::Token<jwt::Claims, jwt::Registered> =
-            jwt::Token::parse(token).map_err(|_| "Invalid JWT Token".into())?;
-        if !parsed.verify(JWT_SECRET.as_bytes(), crypto::sha2::Sha256::new()) {
-            Err("JWT Signature Verification Error".into())
+    pub fn find_user_by_id(db: &SqliteConnection, user_id: i32) -> Result<User, UserOpError> {
+        let mut results = lock_db_read!()
+            .and_then(|_| users.filter(id.eq(user_id))
+                .limit(1)
+                .load::<UserQuery>(db)
+                .map_err(|_| UserOpError::new("Database error")))?;
+        if results.is_empty() {
+            Result::Err(UserOpError::new("No matching user found"))
         } else {
-            parsed.claims.sub
-                .ok_or("Malformed Token".into())
-                .and_then(|mail| Self::find_user_by_email(db, &mail))
+            Result::Ok(results.remove(0).into()) // Take ownership, kill the stupid Vec
         }
     }
 
+    pub fn find_user_by_token(db: &SqliteConnection, token: &str) -> Result<User, UserOpError> {
+        crate::tokens::Token::find_token_by_id(db, token)
+            .ok_or("Invalid token".into())
+            .and_then(|uid| Self::find_user_by_id(db, uid))
+    }
+
     // Create a JWT token for the current user if password matches
-    pub fn create_token(&self, passwd: &str) -> Result<String, UserOpError> {
+    pub fn create_token(&self, db: &SqliteConnection, passwd: &str) -> Result<String, UserOpError> {
         if self.password != passwd {
             Err(UserOpError::new("Password mismatch"))
         } else {
-            jwt::Token::new(
-                jwt::Header::default(),
-                jwt::Claims::new(jwt::Registered {
-                    iss: None,
-                    sub: Some(self.email.clone()),
-                    exp: None,
-                    aud: None,
-                    iat: Some(SystemTime::now().duration_since(UNIX_EPOCH)
-                            .expect("wtf????").as_secs()),
-                    nbf: None,
-                    jti: None
-                })
-            ).signed(JWT_SECRET.as_bytes(), crypto::sha2::Sha256::new())
-             .map_err(|_| UserOpError::new("Failed to generate token"))
+             crate::tokens::Token::create_token(db, self.id)
+                .ok_or("Failed to generate token".into())
         }
     }
 

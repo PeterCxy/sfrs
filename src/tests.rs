@@ -21,13 +21,14 @@ fn should_add_user() {
         .body(r#"{
             "email": "test@example.com",
             "password": "testpw",
-            "pw_cost": "100",
+            "pw_cost": 100,
             "pw_nonce": "whatever",
             "version": "001"
         }"#)
         .dispatch();
     assert_eq!(resp.status(), Status::Ok);
-    assert!(resp.body_string().unwrap().contains(r#"{"token":"#));
+    serde_json::from_str::<serde_json::Value>(&resp.body_string().unwrap()).unwrap()
+        .get("token").unwrap().as_str().unwrap();
 }
 
 #[test]
@@ -37,7 +38,7 @@ fn should_not_add_user_twice() {
         .body(r#"{
             "email": "test1@example.com",
             "password": "testpw",
-            "pw_cost": "100",
+            "pw_cost": 100,
             "pw_nonce": "whatever",
             "version": "001"
         }"#)
@@ -50,7 +51,7 @@ fn should_not_add_user_twice() {
         .body(r#"{
             "email": "test1@example.com",
             "password": "does not matter",
-            "pw_cost": "100",
+            "pw_cost": 100,
             "pw_nonce": "whatever",
             "version": "001"
         }"#)
@@ -65,7 +66,7 @@ fn should_log_in_successfully() {
         .body(r#"{
             "email": "test2@example.com",
             "password": "testpw",
-            "pw_cost": "100",
+            "pw_cost": 100,
             "pw_nonce": "whatever",
             "version": "001"
         }"#)
@@ -81,9 +82,8 @@ fn should_log_in_successfully() {
         }"#)
         .dispatch();
     assert_eq!(resp.status(), Status::Ok);
-    let body = resp.body_string().unwrap();
-    //println!("{}", body);
-    assert!(body.contains(r#"{"token":"#));
+    serde_json::from_str::<serde_json::Value>(&resp.body_string().unwrap()).unwrap()
+        .get("token").unwrap().as_str().unwrap();
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn should_log_in_fail() {
         .body(r#"{
             "email": "test3@example.com",
             "password": "testpw",
-            "pw_cost": "100",
+            "pw_cost": 100,
             "pw_nonce": "whatever",
             "version": "001"
         }"#)
@@ -118,7 +118,7 @@ fn should_change_pw_successfully() {
         .body(r#"{
             "email": "test4@example.com",
             "password": "testpw",
-            "pw_cost": "100",
+            "pw_cost": 100,
             "pw_nonce": "whatever",
             "version": "001"
         }"#)
@@ -144,7 +144,7 @@ fn should_change_pw_fail() {
         .body(r#"{
             "email": "test5@example.com",
             "password": "testpw",
-            "pw_cost": "100",
+            "pw_cost": 100,
             "pw_nonce": "whatever",
             "version": "001"
         }"#)
@@ -170,7 +170,7 @@ fn should_change_pw_successfully_and_log_in_successfully() {
         .body(r#"{
             "email": "test6@example.com",
             "password": "testpw",
-            "pw_cost": "100",
+            "pw_cost": 100,
             "pw_nonce": "whatever",
             "version": "001"
         }"#)
@@ -219,15 +219,15 @@ fn should_success_authorize() {
         .body(r#"{
             "email": "test7@example.com",
             "password": "testpw",
-            "pw_cost": "100",
+            "pw_cost": 100,
             "pw_nonce": "whatever",
             "version": "001"
         }"#)
         .dispatch()
         .body_string()
-        .unwrap()
-        .replace("{\"token\":\"", "")
-        .replace("\"}", "");
+        .unwrap();
+    let val = serde_json::from_str::<serde_json::Value>(&token).unwrap();
+    let token = val.get("token").unwrap().as_str().unwrap();
     let mut resp = CLIENT.get("/auth/ping")
         .header(Header::new("Authorization", format!("Bearer {}", token)))
         .dispatch();
