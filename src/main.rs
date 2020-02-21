@@ -4,6 +4,7 @@
 extern crate rocket;
 #[macro_use]
 extern crate rocket_contrib;
+extern crate rocket_cors;
 #[macro_use]
 extern crate diesel;
 #[macro_use]
@@ -110,7 +111,18 @@ fn run_db_migrations(rocket: Rocket) -> Rocket {
 }
 
 pub fn build_rocket() -> Rocket {
+    // Make CORS options
+    let cors = rocket_cors::CorsOptions {
+        allowed_origins: rocket_cors::AllowedOrigins::All,
+        allowed_methods: vec![rocket::http::Method::Get, rocket::http::Method::Post]
+            .into_iter().map(From::from).collect(),
+        allowed_headers: rocket_cors::AllowedHeaders::all(),
+        send_wildcard: true,
+        ..Default::default()
+    }.to_cors().unwrap();
+
     let r = rocket::custom(build_config())
+        .attach(cors)
         .attach(DbConn::fairing())
         .mount("/", api::routes());
     run_db_migrations(r)
