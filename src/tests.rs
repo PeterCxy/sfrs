@@ -110,3 +110,90 @@ fn should_log_in_fail() {
         .dispatch();
     assert_eq!(resp.status(), Status::InternalServerError);
 }
+
+#[test]
+fn should_change_pw_successfully() {
+    CLIENT.post("/auth")
+        .header(ContentType::JSON)
+        .body(r#"{
+            "email": "test4@example.com",
+            "password": "testpw",
+            "pw_cost": "100",
+            "pw_nonce": "whatever",
+            "version": "001"
+        }"#)
+        .dispatch()
+        .body_string()
+        .unwrap();
+    let resp = CLIENT
+        .post("/auth/change_pw")
+        .header(ContentType::JSON)
+        .body(r#"{
+            "email": "test4@example.com",
+            "password": "testpw1",
+            "current_password": "testpw"
+        }"#)
+        .dispatch();
+    assert_eq!(resp.status(), Status::NoContent);
+}
+
+#[test]
+fn should_change_pw_fail() {
+    CLIENT.post("/auth")
+        .header(ContentType::JSON)
+        .body(r#"{
+            "email": "test5@example.com",
+            "password": "testpw",
+            "pw_cost": "100",
+            "pw_nonce": "whatever",
+            "version": "001"
+        }"#)
+        .dispatch()
+        .body_string()
+        .unwrap();
+    let resp = CLIENT
+        .post("/auth/change_pw")
+        .header(ContentType::JSON)
+        .body(r#"{
+            "email": "test5@example.com",
+            "password": "testpw1",
+            "current_password": "testpw2"
+        }"#)
+        .dispatch();
+    assert_eq!(resp.status(), Status::InternalServerError);
+}
+
+#[test]
+fn should_change_pw_successfully_and_log_in_successfully() {
+    CLIENT.post("/auth")
+        .header(ContentType::JSON)
+        .body(r#"{
+            "email": "test6@example.com",
+            "password": "testpw",
+            "pw_cost": "100",
+            "pw_nonce": "whatever",
+            "version": "001"
+        }"#)
+        .dispatch()
+        .body_string()
+        .unwrap();
+    let resp = CLIENT
+        .post("/auth/change_pw")
+        .header(ContentType::JSON)
+        .body(r#"{
+            "email": "test6@example.com",
+            "password": "testpw1",
+            "current_password": "testpw"
+        }"#)
+        .dispatch();
+    assert_eq!(resp.status(), Status::NoContent);
+    let resp = CLIENT
+        .post("/auth/sign_in")
+        .header(ContentType::JSON)
+        .body(r#"{
+            "email": "test6@example.com",
+            "password": "testpw1"
+        }"#)
+        .dispatch();
+    assert_eq!(resp.status(), Status::Ok);
+}
