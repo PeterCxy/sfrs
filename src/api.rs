@@ -11,7 +11,8 @@ pub fn routes() -> impl Into<Vec<rocket::Route>> {
         auth,
         auth_change_pw,
         auth_sign_in,
-        auth_params
+        auth_params,
+        auth_ping
     ]
 }
 
@@ -119,4 +120,10 @@ fn auth_change_pw(db: DbConn, params: Json<ChangePwParams>) -> Custom<JsonResp<(
         Err(user::UserOpError(e)) =>
             error_resp(Status::InternalServerError, vec![e])
     }
+}
+
+// For testing the User request guard
+#[get("/auth/ping")]
+fn auth_ping(_db: DbConn, u: user::User) -> Custom<JsonResp<String>> {
+    Custom(Status::Ok, Json(Response::Success(u.email)))
 }

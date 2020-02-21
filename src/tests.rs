@@ -1,6 +1,6 @@
 use crate::build_rocket;
 use rocket::local::Client;
-use rocket::http::{ContentType, Status};
+use rocket::http::{Header, ContentType, Status};
 use lazy_static::*;
 
 fn get_test_client() -> Client {
@@ -196,4 +196,41 @@ fn should_change_pw_successfully_and_log_in_successfully() {
         }"#)
         .dispatch();
     assert_eq!(resp.status(), Status::Ok);
+}
+
+#[test]
+fn should_fail_authorize() {
+    let resp = CLIENT.get("/auth/ping").dispatch();
+    assert_eq!(resp.status(), Status::Unauthorized);
+}
+
+#[test]
+fn should_fail_authorize_2() {
+    let resp = CLIENT.get("/auth/ping")
+        .header(Header::new("Authorization", "iwoe0nvie0bv024ibv043bv"))
+        .dispatch();
+    assert_eq!(resp.status(), Status::Unauthorized);
+}
+
+#[test]
+fn should_success_authorize() {
+    let token = CLIENT.post("/auth")
+        .header(ContentType::JSON)
+        .body(r#"{
+            "email": "test7@example.com",
+            "password": "testpw",
+            "pw_cost": "100",
+            "pw_nonce": "whatever",
+            "version": "001"
+        }"#)
+        .dispatch()
+        .body_string()
+        .unwrap()
+        .replace("{\"token\":\"", "")
+        .replace("\"}", "");
+    let mut resp = CLIENT.get("/auth/ping")
+        .header(Header::new("Authorization", token))
+        .dispatch();
+    assert_eq!(resp.status(), Status::Ok);
+    assert_eq!(resp.body_string().unwrap(), "\"test7@example.com\"");
 }

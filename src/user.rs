@@ -3,9 +3,16 @@ use crate::schema::users::dsl::*;
 use crate::{lock_db_write, lock_db_read};
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
+use rocket::request;
+use rocket::http::Status;
 use serde::Deserialize;
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+lazy_static! {
+    static ref JWT_SECRET: String = env::var("SFRS_JWT_SECRET")
+        .expect("Please have SFRS_JWT_SECRET set");
+}
 
 #[derive(Debug)]
 pub struct UserOpError(pub String);
@@ -133,6 +140,18 @@ impl User {
         }
     }
 
+    pub fn find_user_by_token(db: &SqliteConnection, token: &str) -> Result<User, UserOpError> {
+        let parsed: jwt::Token<jwt::Claims, jwt::Registered> =
+            jwt::Token::parse(token).map_err(|_| "Invalid JWT Token".into())?;
+        if !parsed.verify(JWT_SECRET.as_bytes(), crypto::sha2::Sha256::new()) {
+            Err("JWT Signature Verification Error".into())
+        } else {
+            parsed.claims.sub
+                .ok_or("Malformed Token".into())
+                .and_then(|mail| Self::find_user_by_email(db, &mail))
+        }
+    }
+
     // Create a JWT token for the current user if password matches
     pub fn create_token(&self, passwd: &str) -> Result<String, UserOpError> {
         if self.password != passwd {
@@ -150,9 +169,7 @@ impl User {
                     nbf: None,
                     jti: None
                 })
-            ).signed(env::var("SFRS_JWT_SECRET")
-                .expect("Please have SFRS_JWT_SECRET set")
-                .as_bytes(), crypto::sha2::Sha256::new())
+            ).signed(JWT_SECRET.as_bytes(), crypto::sha2::Sha256::new())
              .map_err(|_| UserOpError::new("Failed to generate token"))
         }
     }
@@ -172,6 +189,27 @@ impl User {
                     .execute(db)
                     .map(|_| ())
                     .map_err(|_| UserOpError::new("Database error")))
+        }
+    }
+}
+
+// Implement request guard for User type
+// This is intended for protecting authorized endpoints
+impl<'a, 'r> request::FromRequest<'a, 'r> for User {
+    type Error = UserOpError;
+
+    fn from_request(request: &'a request::Request<'r>) -> request::Outcome<Self, Self::Error> {
+        let token = request.headers().get_one("authorization");
+        match token {
+            None => request::Outcome::Failure((Status::Unauthorized, "Token missing".into())),
+            Some(token) => {
+                let result = Self::find_user_by_token(
+                    &request.guard::<crate::DbConn>().unwrap(), token);
+                match result {
+                    Ok(u) => request::Outcome::Success(u),
+                    Err(err) => request::Outcome::Failure((Status::Unauthorized, err))
+                }
+            }
         }
     }
 }
