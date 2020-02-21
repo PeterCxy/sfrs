@@ -1005,6 +1005,7 @@ dependencies = [
  "diesel_migrations",
  "dotenv",
  "jwt",
+ "lazy_static",
  "rocket",
  "rocket_contrib",
  "rust-crypto",

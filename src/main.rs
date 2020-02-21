@@ -13,17 +13,22 @@ extern crate dotenv;
 extern crate serde;
 extern crate crypto;
 extern crate scrypt;
+#[macro_use]
+#[cfg(test)]
+extern crate lazy_static;
 
 mod schema;
 mod api;
 mod user;
+
+#[cfg(test)]
+mod tests;
 
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use dotenv::dotenv;
 use rocket::Rocket;
 use rocket::config::{Config, Environment, Value};
-use rocket::fairing::AdHoc;
 use std::collections::HashMap;
 use std::env;
 
@@ -69,10 +74,10 @@ fn build_config() -> Config {
         .unwrap()
 }
 
-fn run_db_migrations(rocket: Rocket) -> Result<Rocket, Rocket> {
+fn run_db_migrations(rocket: Rocket) -> Rocket {
     let db = DbConn::get_one(&rocket).expect("Could not connect to Database");
     match embedded_migrations::run(&*db) {
-        Ok(()) => Ok(rocket),
+        Ok(()) => rocket,
         Err(e) => {
             // We should not do anything if database failed to migrate
             panic!("Failed to run database migrations: {:?}", e);
@@ -80,11 +85,14 @@ fn run_db_migrations(rocket: Rocket) -> Result<Rocket, Rocket> {
     }
 }
 
+pub fn build_rocket() -> Rocket {
+    let r = rocket::custom(build_config())
+        .attach(DbConn::fairing())
+        .mount("/", api::routes());
+    run_db_migrations(r)
+}
+
 fn main() {
     dotenv().ok();
-    rocket::custom(build_config())
-        .attach(DbConn::fairing())
-        .attach(AdHoc::on_attach("Database Migrations", run_db_migrations))
-        .mount("/", api::routes())
-        .launch();
+    build_rocket().launch();
 }
