@@ -95,7 +95,7 @@ impl SyncItem {
                     stmt = stmt.filter(id.le(max_id));
                 }
 
-                stmt.order(id.desc())
+                stmt.order(id.asc())
                     .load::<Item>(db)
                     .map_err(|_| "Database error".into())
             })
