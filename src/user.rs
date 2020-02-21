@@ -203,8 +203,12 @@ impl<'a, 'r> request::FromRequest<'a, 'r> for User {
         match token {
             None => request::Outcome::Failure((Status::Unauthorized, "Token missing".into())),
             Some(token) => {
+                if !token.starts_with("Bearer ") {
+                    return request::Outcome::Failure((Status::Unauthorized, "Malformed Token".into()));
+                }
+
                 let result = Self::find_user_by_token(
-                    &request.guard::<crate::DbConn>().unwrap(), token);
+                    &request.guard::<crate::DbConn>().unwrap(), &token[7..]);
                 match result {
                     Ok(u) => request::Outcome::Success(u),
                     Err(err) => request::Outcome::Failure((Status::Unauthorized, err))

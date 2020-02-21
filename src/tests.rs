@@ -207,7 +207,7 @@ fn should_fail_authorize() {
 #[test]
 fn should_fail_authorize_2() {
     let resp = CLIENT.get("/auth/ping")
-        .header(Header::new("Authorization", "iwoe0nvie0bv024ibv043bv"))
+        .header(Header::new("Authorization", "Bearer iwoe0nvie0bv024ibv043bv"))
         .dispatch();
     assert_eq!(resp.status(), Status::Unauthorized);
 }
@@ -229,7 +229,7 @@ fn should_success_authorize() {
         .replace("{\"token\":\"", "")
         .replace("\"}", "");
     let mut resp = CLIENT.get("/auth/ping")
-        .header(Header::new("Authorization", token))
+        .header(Header::new("Authorization", format!("Bearer {}", token)))
         .dispatch();
     assert_eq!(resp.status(), Status::Ok);
     assert_eq!(resp.body_string().unwrap(), "\"test7@example.com\"");
