@@ -14,7 +14,6 @@ extern crate serde;
 extern crate crypto;
 extern crate scrypt;
 #[macro_use]
-#[cfg(test)]
 extern crate lazy_static;
 
 mod schema;
@@ -31,8 +30,32 @@ use rocket::Rocket;
 use rocket::config::{Config, Environment, Value};
 use std::collections::HashMap;
 use std::env;
+use std::sync::RwLock;
 
 embed_migrations!();
+
+// We need a global RwLock for SQLite
+// This is unfortunate when we still use SQLite
+// but should be mostly fine for our purpose
+lazy_static! {
+    pub static ref DB_LOCK: RwLock<()> = RwLock::new(());
+}
+
+#[macro_export]
+macro_rules! lock_db_write {
+    () => {
+        crate::DB_LOCK.write()
+            .map_err(|_| "Cannot lock database for writing".into())
+    };
+}
+
+#[macro_export]
+macro_rules! lock_db_read {
+    () => {
+        crate::DB_LOCK.read()
+            .map_err(|_| "Cannot lock database for reading".into())
+    };
+}
 
 #[database("db")]
 pub struct DbConn(SqliteConnection);

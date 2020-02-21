@@ -1,5 +1,6 @@
 use crate::schema::users;
 use crate::schema::users::dsl::*;
+use crate::{lock_db_write, lock_db_read};
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use serde::Deserialize;
@@ -12,6 +13,12 @@ pub struct UserOpError(pub String);
 impl UserOpError {
     fn new(s: impl Into<String>) -> UserOpError {
         UserOpError(s.into())
+    }
+}
+
+impl Into<UserOpError> for &str {
+    fn into(self) -> UserOpError {
+        UserOpError::new(self)
     }
 }
 
@@ -104,19 +111,21 @@ impl User {
 
         match Self::find_user_by_email(db, &new_user.email) {
             Ok(_) => Err(UserOpError::new("User already registered")),
-            Err(_) => diesel::insert_into(users::table)
-                        .values(user_hashed)
-                        .execute(db)
-                        .map(|_| ())
-                        .map_err(|_| UserOpError::new("Database error"))
+            Err(_) => lock_db_write!()
+                        .and_then(|_| diesel::insert_into(users::table)
+                            .values(user_hashed)
+                            .execute(db)
+                            .map(|_| ())
+                            .map_err(|_| UserOpError::new("Database error")))
         }
     }
 
     pub fn find_user_by_email(db: &SqliteConnection, user_email: &str) -> Result<User, UserOpError> {
-        let mut results = users.filter(email.eq(user_email))
-            .limit(1)
-            .load::<UserQuery>(db)
-            .map_err(|_| UserOpError::new("Database error"))?;
+        let mut results = lock_db_read!()
+            .and_then(|_| users.filter(email.eq(user_email))
+                .limit(1)
+                .load::<UserQuery>(db)
+                .map_err(|_| UserOpError::new("Database error")))?;
         if results.is_empty() {
             Result::Err(UserOpError::new("No matching user found"))
         } else {
@@ -157,11 +166,12 @@ impl User {
             // Update database
             // TODO: Maybe we should revoke all JWTs somehow?
             //      maybe we can record when the user last changed?
-            diesel::update(users.find(self.id))
-                .set(password.eq::<String>(Password::new(new_passwd).into()))
-                .execute(db)
-                .map(|_| ())
-                .map_err(|_| UserOpError::new("Database error"))
+            lock_db_write!()
+                .and_then(|_| diesel::update(users.find(self.id))
+                    .set(password.eq::<String>(Password::new(new_passwd).into()))
+                    .execute(db)
+                    .map(|_| ())
+                    .map_err(|_| UserOpError::new("Database error")))
         }
     }
 }
