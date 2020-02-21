@@ -48,7 +48,7 @@ struct InsertItem {
     updated_at: Option<String>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SyncItem {
     pub uuid: String,
     pub content: Option<String>,
@@ -101,7 +101,16 @@ impl SyncItem {
             })
     }
 
-    pub fn items_insert(db: &SqliteConnection, u: &user::User, it: &SyncItem) -> Result<(), ItemOpError> {
+    pub fn find_item_by_uuid(db: &SqliteConnection, u: &user::User, i: &str) -> Result<Item, ItemOpError> {
+        lock_db_read!()
+            .and_then(|_| {
+                items.filter(owner.eq(u.id).and(uuid.eq(i)))
+                    .first::<Item>(db)
+                    .map_err(|_| "Database error".into())
+            })
+    }
+
+    pub fn items_insert(db: &SqliteConnection, u: &user::User, it: &SyncItem) -> Result<i64, ItemOpError> {
         // First, try to find the original item, if any, delete it, and insert a new one with the same UUID
         // This way, the ID is updated each time an item is updated
         // This method acts both as insertion and update
@@ -133,7 +142,10 @@ impl SyncItem {
                 updated_at: it.updated_at.clone()
             })
             .execute(db)
-            .map(|_| ())
-            .map_err(|_| "Database error".into())
+            .map_err(|_| "Database error".into())?;
+        std::mem::drop(_lock);
+
+        Self::find_item_by_uuid(db, u, &it.uuid)
+            .map(|i| i.id)
     }
 }
