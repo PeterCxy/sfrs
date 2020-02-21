@@ -19,6 +19,7 @@ extern crate lazy_static;
 mod schema;
 mod api;
 mod user;
+mod item;
 
 #[cfg(test)]
 mod tests;

@@ -1,14 +1,14 @@
 table! {
     items (id) {
-        id -> Integer,
+        id -> BigInt, // Forced, diesel does not support intepreting Integer as i64
         owner -> Integer,
         uuid -> Text,
         content -> Nullable<Text>,
         content_type -> Text,
         enc_item_key -> Nullable<Text>,
         deleted -> Bool,
-        created_at -> Date,
-        updated_at -> Date,
+        created_at -> Timestamp,
+        updated_at -> Nullable<Timestamp>,
     }
 }
 
