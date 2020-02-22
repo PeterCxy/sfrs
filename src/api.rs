@@ -209,18 +209,18 @@ fn items_sync(
 
     let inner_params = params.into_inner();
 
-    let mut from_id: Option<i64> = None;
-
-    if let Some(cursor_token) = inner_params.cursor_token {
+    let from_id: Option<i64> = if let Some(cursor_token) = inner_params.cursor_token {
         // If the client provides cursor_token,
         // then, we return all records
         // until sync_token (the head of the last sync)
-        from_id = cursor_token.parse().ok();
-    } else if let Some(sync_token) = inner_params.sync_token.clone() {
+        cursor_token.parse().ok()
+    } else if let Some(sync_token) = inner_params.sync_token {
         // If there is no cursor_token, then we are doing
         // a normal sync, so just return all records from sync_token
-        from_id = sync_token.parse().ok();
-    }
+        sync_token.parse().ok()
+    } else {
+        None
+    };
 
     // First, retrieve what the client needs
     let result = item::SyncItem::items_of_user(&db, &u,
@@ -311,20 +311,12 @@ fn items_sync(
     }
 
     // Remove conflicted items from retrieved items
-    let mut new_retrieved = vec![];
-    for x in resp.retrieved_items.into_iter() {
-        let mut is_conflict = false;
-        for y in resp.conflicts.iter() {
-            if x.uuid == y.uuid() {
-                is_conflict = true;
-            }
-        }
-
-        if !is_conflict {
-            new_retrieved.push(x);
-        }
-    }
-    resp.retrieved_items = new_retrieved;
+    let conflicts = &resp.conflicts;
+    resp.retrieved_items = resp.retrieved_items.into_iter().filter(|x| {
+        !conflicts.iter()
+            .map(|y| x.uuid == y.uuid())
+            .fold(false, |x, y| x || y)
+    }).collect();
 
     Custom(Status::Ok, Json(Response::Success(resp)))
 }
