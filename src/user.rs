@@ -1,7 +1,7 @@
 use crate::schema::users;
 use crate::schema::users::dsl::*;
 use crate::{lock_db_write, lock_db_read};
-use crate::uuid::Uuid;
+use ::uuid::Uuid;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use rocket::request;

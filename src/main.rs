@@ -1,23 +1,17 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
-extern crate regex;
 #[macro_use]
 extern crate rocket;
 #[macro_use]
 extern crate rocket_contrib;
-extern crate rocket_cors;
 #[macro_use]
 extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
-extern crate dotenv;
 #[macro_use]
 extern crate serde;
-extern crate serde_json;
-extern crate scrypt;
 #[macro_use]
 extern crate lazy_static;
-extern crate uuid;
 
 mod schema;
 mod api;
