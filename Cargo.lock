@@ -1080,6 +1080,7 @@ dependencies = [
  "diesel_migrations",
  "dotenv",
  "lazy_static",
+ "regex 1.3.4",
  "rocket",
  "rocket_contrib",
  "rocket_cors",

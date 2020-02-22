@@ -17,3 +17,4 @@ scrypt = "0.2.0"
 uuid = { version = "0.8", features = ["v4"] }
 chrono = "0.4"
 serde_json = "1.0"
+regex = "1"

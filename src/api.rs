@@ -9,6 +9,12 @@ use rocket_contrib::json::Json;
 use serde::{Serialize, Deserialize};
 use std::vec::Vec;
 
+lazy_static! {
+    static ref EMAIL_RE: regex::Regex =
+        regex::Regex::new(r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})")
+                .unwrap();
+}
+
 pub fn routes() -> impl Into<Vec<rocket::Route>> {
     routes![
         auth,
@@ -56,6 +62,10 @@ struct AuthResult {
 
 #[post("/auth", format = "json", data = "<new_user>")]
 fn auth(db: DbConn, new_user: Json<user::NewUser>) -> Custom<JsonResp<AuthResult>> {
+    if !EMAIL_RE.is_match(&new_user.email) {
+        return error_resp(Status::BadRequest, vec!["Invalid email address".into()]);
+    }
+
     match user::User::create(&db.0, &new_user) {
         Ok(_) => _sign_in(db, &new_user.email, &new_user.password),
         Err(user::UserOpError(e)) =>
