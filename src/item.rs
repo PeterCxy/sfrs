@@ -25,6 +25,14 @@ impl Into<ItemOpError> for &str {
 
 #[derive(Queryable)]
 pub struct Item {
+    // This "id", though primary key, is not how the client actually
+    // identifies an item, and it is not sent to the client.
+    // Instead, this "id" is more like a "timestamp", in the sense
+    // that each time an item is modified, it increments.
+    // (this incrementing is achieved by deleting and re-inserting
+    //  the item and relying on AUTOINCREMENT)
+    // This is used in place of the role of timestamp in the Ruby
+    // and Go implementation.
     pub id: i64,
     pub owner: i32,
     pub uuid: String,
