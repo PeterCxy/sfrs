@@ -60,6 +60,22 @@ fn should_not_add_user_twice() {
 }
 
 #[test]
+fn should_not_add_user_invalid_email() {
+    let resp = CLIENT
+        .post("/auth")
+        .header(ContentType::JSON)
+        .body(r#"{
+            "email": "test.example.com",
+            "password": "testpw",
+            "pw_cost": 100,
+            "pw_nonce": "whatever",
+            "version": "001"
+        }"#)
+        .dispatch();
+    assert_eq!(resp.status(), Status::BadRequest);
+}
+
+#[test]
 fn should_log_in_successfully() {
     CLIENT.post("/auth")
         .header(ContentType::JSON)
