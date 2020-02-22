@@ -273,21 +273,17 @@ fn items_sync(
         });
 
     // Convert conflicts into the format our client wants
-    resp.conflicts = items_conflicted.into_iter().map(|(client_item, server_item)| {
-        // We assume enc_item_key "identifies" an "item"
-        if client_item.enc_item_key == server_item.enc_item_key {
-            SyncConflict {
-                conf_type: "sync_conflict".to_string(),
-                server_item: Some(server_item),
-                unsaved_item: None
-            }
-        } else {
-            // A UUID conflict (unlikely)
-            SyncConflict {
-                conf_type: "uuid_conflict".to_string(),
-                server_item: None,
-                unsaved_item: Some(client_item)
-            }
+    resp.conflicts = items_conflicted.into_iter().map(|(_client_item, server_item)| {
+        // Our implementation never produces `uuid_conflict`
+        // because the primary key of the `items` table is an internal ID
+        // and we retrieve content based on (user, uuid) tuple, not just uuid.
+        // The whole point of having `uuid_conflict` in their official impl
+        // is because they use `uuid` as the primary key, so two items
+        // on the same server cannot share the same uuid
+        SyncConflict {
+            conf_type: "sync_conflict".to_string(),
+            server_item: Some(server_item),
+            unsaved_item: None
         }
     }).collect();
 
