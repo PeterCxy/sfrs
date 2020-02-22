@@ -2,6 +2,7 @@ use crate::DbConn;
 use crate::user;
 use crate::item;
 use crate::lock::UserLock;
+use itertools::{Itertools, Either};
 use rocket::State;
 use rocket::http::Status;
 use rocket::response::status::Custom;
@@ -258,42 +259,41 @@ fn items_sync(
         }
     }
 
-    // Then, update all items sent by client
-    let mut last_id: i64 = -1;
-    for mut it in inner_params.items.into_iter() {
-        // Handle conflicts 
-        // Anything that we just retrieved but need to save immediately
-        // is potentially a conflict
-        // TODO: how do we handle this when the sync needs multiple requests
-        //   to finish?
-        let mut conflicted = false;
-        for y in resp.retrieved_items.iter() {
-            if it.uuid == y.uuid {
-                conflicted = true;
-                // We assume enc_item_key identifies an "item"
-                if it.enc_item_key == y.enc_item_key {
-                    // A sync conflict
-                    resp.conflicts.push(SyncConflict {
-                        conf_type: "sync_conflict".to_string(),
-                        server_item: Some(y.clone()),
-                        unsaved_item: None
-                    });
-                } else {
-                    // A UUID conflict (unlikely)
-                    resp.conflicts.push(SyncConflict {
-                        conf_type: "uuid_conflict".to_string(),
-                        server_item: None,
-                        unsaved_item: Some(it.clone())
-                    })
-                }
+    // Detect conflicts between client items and server items
+    let (items_conflicted, items_to_save): (Vec<_>, Vec<_>) =
+        inner_params.items.into_iter().partition_map(|client_item| {
+            let conflict: Vec<_> = resp.retrieved_items.iter()
+                .filter(|server_item| client_item.uuid == server_item.uuid)
+                .collect();
+            if !conflict.is_empty() {
+                Either::Left((client_item, conflict[0].clone()))
+            } else {
+                Either::Right(client_item)
+            }
+        });
+
+    // Convert conflicts into the format our client wants
+    resp.conflicts = items_conflicted.into_iter().map(|(client_item, server_item)| {
+        // We assume enc_item_key "identifies" an "item"
+        if client_item.enc_item_key == server_item.enc_item_key {
+            SyncConflict {
+                conf_type: "sync_conflict".to_string(),
+                server_item: Some(server_item),
+                unsaved_item: None
+            }
+        } else {
+            // A UUID conflict (unlikely)
+            SyncConflict {
+                conf_type: "uuid_conflict".to_string(),
+                server_item: None,
+                unsaved_item: Some(client_item)
             }
         }
+    }).collect();
 
-        // do not save conflicted items
-        if conflicted {
-            continue;
-        }
-
+    // Then, update all items sent by client
+    let mut last_id: i64 = -1;
+    for mut it in items_to_save.into_iter() {
         // Always update updated_at for all items on server
         it.updated_at = 
             Some(chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
