@@ -1,0 +1,3 @@
+DROP INDEX index_user_email_20200222110735;
+DROP INDEX index_item_uuid_owner_20200222110735;
+DROP INDEX index_token_uid_20200222110735;
