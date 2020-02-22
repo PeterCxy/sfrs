@@ -328,5 +328,5 @@ fn items_sync(
             .fold(false, |x, y| x || y)
     }).collect();
 
-    Custom(Status::Ok, Json(Response::Success(resp)))
+    success_resp(resp)
 }
