@@ -190,63 +190,41 @@ fn items_sync(
     let mutex = lock.get_mutex(u.id);
     let _lock = mutex.lock().unwrap();
 
+    // sync_token should always be set to the maximum ID currently available
+    // (for this user, of course)
+    let new_sync_token = match item::SyncItem::get_current_max_id(&db, &u) {
+        Ok(Some(id)) => Some(id.to_string()),
+        Ok(None) => None,
+        Err(item::ItemOpError(e)) =>
+            return error_resp(Status::InternalServerError, vec![e])
+    };
+
     let mut resp = SyncResp {
         retrieved_items: vec![],
         saved_items: vec![],
         conflicts: vec![],
-        sync_token: None,
+        sync_token: new_sync_token,
         cursor_token: None
     };
 
     let inner_params = params.into_inner();
 
     let mut from_id: Option<i64> = None;
-    let mut max_id: Option<i64> = None;
-    let mut had_cursor = false;
-    // mark if we have a larger sync_token than cursor_token
-    let mut sync_token_ahead = false;
 
     if let Some(cursor_token) = inner_params.cursor_token {
         // If the client provides cursor_token,
         // then, we return all records
         // until sync_token (the head of the last sync)
         from_id = cursor_token.parse().ok();
-        had_cursor = true;
-    }
-    
-    if let Some(sync_token) = inner_params.sync_token.clone() {
-        if !had_cursor {
-            // If there is no cursor_token, then we are doing
-            // a normal sync, so just return all records from sync_token
-            from_id = sync_token.parse().ok();
-        } else {
-            // When we have both a cursor_token and a sync_token,
-            // we need to always make sure we don't go *beyond* sync_token
-            max_id = sync_token.parse().ok()
-                    .and_then(|x| {
-                        if x < from_id.unwrap() {
-                            // If sync_token is smaller than cursor_token
-                            // we don't set a max_id
-                            // we will synchronize the two later after
-                            // items are retrieved.
-                            // We don't need to worry about the case
-                            // where sync_token = cursor_token, because
-                            // in that case we will get empty result,
-                            // and sync_token will get updated anyway
-                            None
-                        } else {
-                            // Tell our program logic later to not update
-                            // sync_token (because it's already ahead)
-                            sync_token_ahead = true;
-                            Some(x)
-                        }
-                    });
-        }
+    } else if let Some(sync_token) = inner_params.sync_token.clone() {
+        // If there is no cursor_token, then we are doing
+        // a normal sync, so just return all records from sync_token
+        from_id = sync_token.parse().ok();
     }
 
     // First, retrieve what the client needs
     let result = item::SyncItem::items_of_user(&db, &u,
-        from_id, max_id, inner_params.limit);
+        from_id, None, inner_params.limit);
 
     match result {
         Err(item::ItemOpError(e)) => {
@@ -256,9 +234,7 @@ fn items_sync(
             if !items.is_empty() {
                 // If we fetched something, and the length is right at limit
                 // we may have more to fetch. In this case, we need to
-                // inform the client to continue fetching, until there is
-                // nothing more to fetch
-                // (i.e. until cursor_token is equal to sync_token)
+                // inform the client to continue fetching
                 let next_from = items.last().unwrap().id;
                 if let Some(limit) = inner_params.limit {
                     if items.len() as i64 == limit {
@@ -266,32 +242,8 @@ fn items_sync(
                         resp.cursor_token = Some(next_from.to_string());
                     }
                 }
-                
-                if sync_token_ahead {
-                    // Always keep sync_token unchanged in this case
-                    // (this may change later when we save items)
-                    resp.sync_token = inner_params.sync_token;
-                } else {
-                    // If sync_token is not ahead of cursor_token
-                    // (or cursor_token is simply null)
-                    // update it to latest
-                    // Since it's sync_token, we don't need to worry
-                    // about whether we *actually* have anything to fetch
-                    resp.sync_token = Some(next_from.to_string());
-                }
-            } else {
-                if had_cursor {
-                    // If we already have no item to give, but the client still holds a cursor
-                    // Revoke that cursor, and make it the sync_token
-                    // (this may change later when we save items)
-                    resp.sync_token = resp.cursor_token.clone();
-                    resp.cursor_token = None;
-                } else {
-                    // Pass the same sync_token back
-                    // (this may change later when we save items)
-                    resp.sync_token = inner_params.sync_token;
-                }
             }
+
             resp.retrieved_items = items.into_iter().map(|x| x.into()).collect();
         }
     }
@@ -348,6 +300,8 @@ fn items_sync(
     }
 
     if last_id > -1 {
+        // Since we have added more items to the database,
+        // the sync_token we had no longer points to the latest item
         // Update sync_token to the latest one of our saved items
         // This is ALWAYS the case. `sync_token` indicates the
         // LATEST known state of the system by the client,

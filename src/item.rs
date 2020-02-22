@@ -2,6 +2,7 @@ use crate::schema::items;
 use crate::schema::items::dsl::*;
 use crate::{lock_db_write, lock_db_read};
 use crate::user;
+use diesel::dsl::max;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use serde::{Serialize, Deserialize};
@@ -106,6 +107,20 @@ impl SyncItem {
             .and_then(|_| {
                 items.filter(owner.eq(u.id).and(uuid.eq(i)))
                     .first::<Item>(db)
+                    .map_err(|_| "Database error".into())
+            })
+    }
+
+    // Get the current maximum item ID for a user.
+    // Remember that IDs do not identify item; instead, they are incremented to the largest value
+    // every time an item is updated (see Self::items_insert).
+    // The ID returned by this function is more like a "timestamp" of the latest "state"
+    pub fn get_current_max_id(db: &SqliteConnection, u: &user::User) -> Result<Option<i64>, ItemOpError> {
+        lock_db_read!()
+            .and_then(|_| {
+                items.filter(owner.eq(u.id))
+                    .select(max(id))
+                    .first::<Option<i64>>(db)
                     .map_err(|_| "Database error".into())
             })
     }
