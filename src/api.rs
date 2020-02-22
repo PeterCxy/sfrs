@@ -1,6 +1,8 @@
 use crate::DbConn;
 use crate::user;
 use crate::item;
+use crate::lock::UserLock;
+use rocket::State;
 use rocket::http::Status;
 use rocket::response::status::Custom;
 use rocket_contrib::json::Json;
@@ -180,7 +182,14 @@ struct SyncResp {
 }
 
 #[post("/items/sync", format = "json", data = "<params>")]
-fn items_sync(db: DbConn, u: user::User, params: Json<SyncParams>) -> Custom<JsonResp<SyncResp>> {
+fn items_sync(
+    db: DbConn, lock: State<UserLock>,
+    u: user::User, params: Json<SyncParams>
+) -> Custom<JsonResp<SyncResp>> {
+    // Only allow one sync per user at the same time
+    let mutex = lock.get_mutex(u.id);
+    let _lock = mutex.lock().unwrap();
+
     let mut resp = SyncResp {
         retrieved_items: vec![],
         saved_items: vec![],

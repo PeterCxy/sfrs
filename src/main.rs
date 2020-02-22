@@ -23,6 +23,7 @@ mod api;
 mod tokens;
 mod user;
 mod item;
+mod lock;
 
 #[cfg(test)]
 mod tests;
@@ -126,6 +127,7 @@ pub fn build_rocket() -> Rocket {
     let r = rocket::custom(build_config())
         .attach(cors)
         .attach(DbConn::fairing())
+        .manage(lock::UserLock::new())
         .mount("/", api::routes());
     run_db_migrations(r)
 }
