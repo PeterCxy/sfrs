@@ -194,6 +194,8 @@ fn items_sync(db: DbConn, u: user::User, params: Json<SyncParams>) -> Custom<Jso
     let mut from_id: Option<i64> = None;
     let mut max_id: Option<i64> = None;
     let mut had_cursor = false;
+    // mark if we have a larger sync_token than cursor_token
+    let mut sync_token_ahead = false;
 
     if let Some(cursor_token) = inner_params.cursor_token {
         // If the client provides cursor_token,
@@ -211,7 +213,25 @@ fn items_sync(db: DbConn, u: user::User, params: Json<SyncParams>) -> Custom<Jso
         } else {
             // When we have both a cursor_token and a sync_token,
             // we need to always make sure we don't go *beyond* sync_token
-            max_id = sync_token.parse().ok();
+            max_id = sync_token.parse().ok()
+                    .and_then(|x| {
+                        if x < from_id.unwrap() {
+                            // If sync_token is smaller than cursor_token
+                            // we don't set a max_id
+                            // we will synchronize the two later after
+                            // items are retrieved.
+                            // We don't need to worry about the case
+                            // where sync_token = cursor_token, because
+                            // in that case we will get empty result,
+                            // and sync_token will get updated anyway
+                            None
+                        } else {
+                            // Tell our program logic later to not update
+                            // sync_token (because it's already ahead)
+                            sync_token_ahead = true;
+                            Some(x)
+                        }
+                    });
         }
     }
 
@@ -238,9 +258,18 @@ fn items_sync(db: DbConn, u: user::User, params: Json<SyncParams>) -> Custom<Jso
                     }
                 }
                 
-                // Always keep sync_token unchanged in this case
-                // (this may change later when we save items)
-                resp.sync_token = inner_params.sync_token;
+                if sync_token_ahead {
+                    // Always keep sync_token unchanged in this case
+                    // (this may change later when we save items)
+                    resp.sync_token = inner_params.sync_token;
+                } else {
+                    // If sync_token is not ahead of cursor_token
+                    // (or cursor_token is simply null)
+                    // update it to latest
+                    // Since it's sync_token, we don't need to worry
+                    // about whether we *actually* have anything to fetch
+                    resp.sync_token = Some(next_from.to_string());
+                }
             } else {
                 if had_cursor {
                     // If we already have no item to give, but the client still holds a cursor
