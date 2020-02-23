@@ -1,10 +1,9 @@
 use crate::schema::items;
 use crate::schema::items::dsl::*;
-use crate::{lock_db_write, lock_db_read};
+use crate::{SqliteLike, lock_db_write, lock_db_read};
 use crate::user;
 use diesel::dsl::max;
 use diesel::prelude::*;
-use diesel::sqlite::SqliteConnection;
 use serde::{Serialize, Deserialize};
 use std::vec::Vec;
 
@@ -85,7 +84,7 @@ impl Into<SyncItem> for Item {
 
 impl SyncItem {
     pub fn items_of_user(
-        db: &SqliteConnection, u: &user::User,
+        db: &impl SqliteLike, u: &user::User,
         since_id: Option<i64>, max_id: Option<i64>,
         limit: Option<i64>
     ) -> Result<Vec<Item>, ItemOpError> {
@@ -110,7 +109,7 @@ impl SyncItem {
             })
     }
 
-    pub fn find_item_by_uuid(db: &SqliteConnection, u: &user::User, i: &str) -> Result<Item, ItemOpError> {
+    pub fn find_item_by_uuid(db: &impl SqliteLike, u: &user::User, i: &str) -> Result<Item, ItemOpError> {
         lock_db_read!()
             .and_then(|_| {
                 items.filter(owner.eq(u.id).and(uuid.eq(i)))
@@ -123,7 +122,7 @@ impl SyncItem {
     // Remember that IDs do not identify item; instead, they are incremented to the largest value
     // every time an item is updated (see Self::items_insert).
     // The ID returned by this function is more like a "timestamp" of the latest "state"
-    pub fn get_current_max_id(db: &SqliteConnection, u: &user::User) -> Result<Option<i64>, ItemOpError> {
+    pub fn get_current_max_id(db: &impl SqliteLike, u: &user::User) -> Result<Option<i64>, ItemOpError> {
         lock_db_read!()
             .and_then(|_| {
                 items.filter(owner.eq(u.id))
@@ -133,7 +132,7 @@ impl SyncItem {
             })
     }
 
-    pub fn items_insert(db: &SqliteConnection, u: &user::User, it: &SyncItem) -> Result<i64, ItemOpError> {
+    pub fn items_insert(db: &impl SqliteLike, u: &user::User, it: &SyncItem) -> Result<i64, ItemOpError> {
         // First, try to find the original item, if any, delete it, and insert a new one with the same UUID
         // This way, the ID is updated each time an item is updated
         // This method acts both as insertion and update

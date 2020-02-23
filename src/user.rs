@@ -1,9 +1,8 @@
 use crate::schema::users;
 use crate::schema::users::dsl::*;
-use crate::{lock_db_write, lock_db_read};
+use crate::{SqliteLike, lock_db_write, lock_db_read};
 use ::uuid::Uuid;
 use diesel::prelude::*;
-use diesel::sqlite::SqliteConnection;
 use rocket::request;
 use rocket::http::Status;
 use serde::Deserialize;
@@ -114,7 +113,7 @@ struct NewUserInsert {
 }
 
 impl User {
-    pub fn create(db: &SqliteConnection, new_user: &NewUser) -> Result<String, UserOpError> {
+    pub fn create(db: &impl SqliteLike, new_user: &NewUser) -> Result<String, UserOpError> {
         let uid = Uuid::new_v4().to_hyphenated().to_string();
         let user_hashed = NewUserInsert {
             uuid: uid.clone(),
@@ -136,7 +135,7 @@ impl User {
         }
     }
 
-    pub fn find_user_by_email(db: &SqliteConnection, user_email: &str) -> Result<User, UserOpError> {
+    pub fn find_user_by_email(db: &impl SqliteLike, user_email: &str) -> Result<User, UserOpError> {
         let mut results = lock_db_read!()
             .and_then(|_| users.filter(email.eq(user_email))
                 .limit(1)
@@ -149,7 +148,7 @@ impl User {
         }
     }
 
-    pub fn find_user_by_id(db: &SqliteConnection, user_id: i32) -> Result<User, UserOpError> {
+    pub fn find_user_by_id(db: &impl SqliteLike, user_id: i32) -> Result<User, UserOpError> {
         let mut results = lock_db_read!()
             .and_then(|_| users.filter(id.eq(user_id))
                 .limit(1)
@@ -162,14 +161,14 @@ impl User {
         }
     }
 
-    pub fn find_user_by_token(db: &SqliteConnection, token: &str) -> Result<User, UserOpError> {
+    pub fn find_user_by_token(db: &impl SqliteLike, token: &str) -> Result<User, UserOpError> {
         crate::tokens::Token::find_token_by_id(db, token)
             .ok_or("Invalid token".into())
             .and_then(|uid| Self::find_user_by_id(db, uid))
     }
 
     // Create a JWT token for the current user if password matches
-    pub fn create_token(&self, db: &SqliteConnection, passwd: &str) -> Result<String, UserOpError> {
+    pub fn create_token(&self, db: &impl SqliteLike, passwd: &str) -> Result<String, UserOpError> {
         if self.password != passwd {
             Err(UserOpError::new("Password mismatch"))
         } else {
@@ -180,7 +179,7 @@ impl User {
 
     // Change the password in database, if old password is provided
     // The current instance of User model will not be mutated
-    pub fn change_pw(&self, db: &SqliteConnection, passwd: &str, new_passwd: &str) -> Result<(), UserOpError> {
+    pub fn change_pw(&self, db: &impl SqliteLike, passwd: &str, new_passwd: &str) -> Result<(), UserOpError> {
         if self.password != passwd {
             Err(UserOpError::new("Password mismatch"))
         } else {
@@ -212,7 +211,7 @@ impl<'a, 'r> request::FromRequest<'a, 'r> for User {
                 }
 
                 let result = Self::find_user_by_token(
-                    &request.guard::<crate::DbConn>().unwrap(), &token[7..]);
+                    &request.guard::<crate::DbConn>().unwrap().0, &token[7..]);
                 match result {
                     Ok(u) => request::Outcome::Success(u),
                     Err(err) => request::Outcome::Failure((Status::Unauthorized, err))

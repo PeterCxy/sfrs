@@ -88,8 +88,8 @@ fn auth_sign_in(db: DbConn, params: Json<SignInParams>) -> Custom<JsonResp<AuthR
 // Shared logic for all interfaces that needs to do an automatic sign-in
 fn _sign_in(db: DbConn, mail: &str, passwd: &str) -> Custom<JsonResp<AuthResult>> {
     // Try to find the user first
-    let res = user::User::find_user_by_email(&db, mail)
-                .and_then(|u| u.create_token(&db, passwd)
+    let res = user::User::find_user_by_email(&db.0, mail)
+                .and_then(|u| u.create_token(&db.0, passwd)
                                 .map(|x| (u.uuid, u.email, x)));
     match res {
         Ok((uuid, email, token)) => success_resp(AuthResult {
@@ -123,7 +123,7 @@ impl Into<AuthParams> for user::User {
 
 #[get("/auth/params?<email>")]
 fn auth_params(db: DbConn, email: String) -> Custom<JsonResp<AuthParams>> {
-    match user::User::find_user_by_email(&db, &email) {
+    match user::User::find_user_by_email(&db.0, &email) {
         Ok(u) => success_resp(u.into()),
         Err(user::UserOpError(e)) =>
             error_resp(Status::InternalServerError, vec![e])
@@ -139,9 +139,9 @@ struct ChangePwParams {
 
 #[post("/auth/change_pw", format = "json", data = "<params>")]
 fn auth_change_pw(db: DbConn, params: Json<ChangePwParams>) -> Custom<JsonResp<()>> {
-    let res = user::User::find_user_by_email(&db, &params.email)
+    let res = user::User::find_user_by_email(&db.0, &params.email)
                 .and_then(|u|
-                    u.change_pw(&db, &params.current_password, &params.password));
+                    u.change_pw(&db.0, &params.current_password, &params.password));
     match res {
         Ok(_) => Custom(Status::NoContent, Json(Response::Success(()))),
         Err(user::UserOpError(e)) =>
@@ -216,7 +216,7 @@ fn items_sync(
     // Remember that we have a mutex at the beginning of this function,
     // so all that can change the current_max_id for the current user
     // is operations later in this function.
-    let new_sync_token = match item::SyncItem::get_current_max_id(&db, &u) {
+    let new_sync_token = match item::SyncItem::get_current_max_id(&db.0, &u) {
         Ok(Some(id)) => Some(id.to_string()),
         Ok(None) => None,
         Err(item::ItemOpError(e)) =>
@@ -247,7 +247,7 @@ fn items_sync(
     };
 
     // First, retrieve what the client needs
-    let result = item::SyncItem::items_of_user(&db, &u,
+    let result = item::SyncItem::items_of_user(&db.0, &u,
         from_id, None, inner_params.limit);
 
     match result {
@@ -307,7 +307,7 @@ fn items_sync(
         it.updated_at = 
             Some(chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
 
-        match item::SyncItem::items_insert(&db, &u, &it) {
+        match item::SyncItem::items_insert(&db.0, &u, &it) {
             Err(item::ItemOpError(e)) => {
                 return error_resp(Status::InternalServerError, vec![e]);
             },

@@ -1,4 +1,4 @@
-#![feature(proc_macro_hygiene, decl_macro)]
+#![feature(proc_macro_hygiene, decl_macro, trait_alias)]
 
 #[macro_use]
 extern crate rocket;
@@ -13,6 +13,7 @@ extern crate serde;
 #[macro_use]
 extern crate lazy_static;
 
+mod db;
 mod schema;
 mod api;
 mod tokens;
@@ -23,42 +24,19 @@ mod lock;
 #[cfg(test)]
 mod tests;
 
+pub use db::*;
+
 use diesel::prelude::*;
-use diesel::sqlite::SqliteConnection;
 use dotenv::dotenv;
 use rocket::Rocket;
 use rocket::config::{Config, Environment, Value};
 use std::collections::HashMap;
 use std::env;
-use std::sync::RwLock;
 
 embed_migrations!();
 
-// We need a global RwLock for SQLite
-// This is unfortunate when we still use SQLite
-// but should be mostly fine for our purpose
-lazy_static! {
-    pub static ref DB_LOCK: RwLock<()> = RwLock::new(());
-}
-
-#[macro_export]
-macro_rules! lock_db_write {
-    () => {
-        crate::DB_LOCK.write()
-            .map_err(|_| "Cannot lock database for writing".into())
-    };
-}
-
-#[macro_export]
-macro_rules! lock_db_read {
-    () => {
-        crate::DB_LOCK.read()
-            .map_err(|_| "Cannot lock database for reading".into())
-    };
-}
-
 #[database("db")]
-pub struct DbConn(SqliteConnection);
+pub struct DbConn(BusyWaitSqliteConnection);
 
 #[get("/")]
 fn index() -> &'static str {
