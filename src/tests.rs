@@ -14,6 +14,41 @@ lazy_static! {
 }
 
 #[test]
+fn sync_token_dec_1() {
+    dotenv::from_filename(".env.test").unwrap();
+    // We have to test decryption of a particular encrypted ID
+    // to ensure we break nothing during updates
+    let id = crate::sync_tokens::token_to_max_id("a3e43acc6c407dcb155598410be6524bfe483452b0c43b8c4cc8fe37ef183e6b6fc1").unwrap();
+    assert_eq!(id, 114514);
+}
+
+#[test]
+fn sync_token_dec_2() {
+    dotenv::from_filename(".env.test").unwrap();
+    // We have to test decryption of a particular encrypted ID
+    // to ensure we break nothing during updates
+    let id = crate::sync_tokens::token_to_max_id("cfb84e2eb08f8aaf959cc20a9f86225594abb0f0a40f56f692ea1475a00777f902a251").unwrap();
+    assert_eq!(id, 1919810);
+}
+
+#[test]
+fn sync_token_enc_dec_1() {
+    dotenv::from_filename(".env.test").unwrap();
+    let token = crate::sync_tokens::max_id_to_token(114514);
+    let id = crate::sync_tokens::token_to_max_id(&token).unwrap();
+    assert_eq!(id, 114514);
+}
+
+#[test]
+fn sync_token_enc_dec_2() {
+    dotenv::from_filename(".env.test").unwrap();
+    let token = crate::sync_tokens::max_id_to_token(1919810);
+    let id = crate::sync_tokens::token_to_max_id(&token).unwrap();
+    assert_eq!(id, 1919810);
+}
+
+
+#[test]
 fn should_add_user() {
     let mut resp = CLIENT
         .post("/auth")
