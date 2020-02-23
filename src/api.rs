@@ -198,11 +198,24 @@ fn items_sync(
     u: user::User, params: Json<SyncParams>
 ) -> Custom<JsonResp<SyncResp>> {
     // Only allow one sync per user at the same time
+    // Operations below are far from atomic (neither are they in Ruby or Go impl)
+    // so allowing multiple synchronize sessions each time can cause
+    // some confusing behavior, e.g. another sync session might insert
+    // something new into the database after this one gets the current_max_id
+    // but before this one returns. It can also mess things up during
+    // insertions into the database.
+    // In short, do not let the same user synchronize from two clients
+    // at the same time. All code below assumes that this lock works
+    // and at any given point in time, up to one sync process is running
+    // for each user.
     let mutex = lock.get_mutex(u.id);
     let _lock = mutex.lock().unwrap();
 
     // sync_token should always be set to the maximum ID currently available
     // (for this user, of course)
+    // Remember that we have a mutex at the beginning of this function,
+    // so all that can change the current_max_id for the current user
+    // is operations later in this function.
     let new_sync_token = match item::SyncItem::get_current_max_id(&db, &u) {
         Ok(Some(id)) => Some(id.to_string()),
         Ok(None) => None,
