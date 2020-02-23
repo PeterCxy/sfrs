@@ -15,6 +15,7 @@ extern crate lazy_static;
 
 mod db;
 mod schema;
+mod sync_tokens;
 mod api;
 mod tokens;
 mod user;

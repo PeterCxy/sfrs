@@ -217,7 +217,7 @@ fn items_sync(
     // so all that can change the current_max_id for the current user
     // is operations later in this function.
     let new_sync_token = match item::SyncItem::get_current_max_id(&db.0, &u) {
-        Ok(Some(id)) => Some(id.to_string()),
+        Ok(Some(id)) => Some(crate::sync_tokens::max_id_to_token(id)),
         Ok(None) => None,
         Err(item::ItemOpError(e)) =>
             return error_resp(Status::InternalServerError, vec![e])
@@ -237,11 +237,19 @@ fn items_sync(
         // If the client provides cursor_token,
         // then, we return all records
         // until sync_token (the head of the last sync)
-        cursor_token.parse().ok()
+        match crate::sync_tokens::token_to_max_id(&cursor_token) {
+            Err(()) =>
+                return error_resp(Status::InternalServerError, vec!["Invalid cursor_token".into()]),
+            Ok(id) => Some(id)
+        }
     } else if let Some(sync_token) = inner_params.sync_token {
         // If there is no cursor_token, then we are doing
         // a normal sync, so just return all records from sync_token
-        sync_token.parse().ok()
+        match crate::sync_tokens::token_to_max_id(&sync_token) {
+            Err(()) =>
+                return error_resp(Status::InternalServerError, vec!["Invalid sync_token".into()]),
+            Ok(id) => Some(id)
+        }
     } else {
         None
     };
@@ -263,7 +271,7 @@ fn items_sync(
                 if let Some(limit) = inner_params.limit {
                     if items.len() as i64 == limit {
                         // We may still have something to fetch
-                        resp.cursor_token = Some(next_from.to_string());
+                        resp.cursor_token = Some(crate::sync_tokens::max_id_to_token(next_from));
                     }
                 }
             }
@@ -326,7 +334,7 @@ fn items_sync(
         // LATEST known state of the system by the client,
         // but it MAY still need to fill in a bit of history
         // (that's where `cursor_token` comes into play)
-        resp.sync_token = Some(last_id.to_string());
+        resp.sync_token = Some(crate::sync_tokens::max_id_to_token(last_id));
     }
 
     // Remove conflicted items from retrieved items
