@@ -30,7 +30,7 @@ pub use db::*;
 use diesel::prelude::*;
 use dotenv::dotenv;
 use rocket::Rocket;
-use rocket::config::{Config, Environment, Value};
+use rocket::config::{Config, Environment, Value, Limits};
 use std::collections::HashMap;
 use std::env;
 
@@ -72,6 +72,7 @@ fn get_environment() -> Environment {
 fn build_config() -> Config {
     Config::build(get_environment())
         .extra("databases", db_config())
+        .limits(Limits::new().limit("json", 50 * 1024 * 1024))
         .finalize()
         .unwrap()
 }
