@@ -12,7 +12,7 @@ Contact
 
 For issues and patches, please use the following contact methods
 
-- Google Groups: petercxy-projects@googlegroups.com ([web](https://groups.google.com/forum/?oldui=1#!forum/petercxy-projects))
+- Mailing List (SourceHut): <https://lists.sr.ht/~petercxy/general>
 - Matrix Chat Room: #petercxy-projects:neo.angry.im
 
 Disclaimer
