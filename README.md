@@ -1,9 +1,19 @@
 SFRS
 ---
 
+Main repository: <https://cgit.typeblog.net/sfrs/>. __The GitHub repository is merely a mirror.__
+
 SFRS is an implementation of the synchronization server of Standard Notes, written in Rust. It is intended for personal usage, especially for those that would like to self-host the server for maximum possible privacy, even when Standard Notes already uses purely client-side encryption by default.
 
 Standard Notes is a free and open-source note-taking application that focuses on simplicity and longevity. Please refer to [their website](https://standardnotes.org/) for further information on Standard Notes itself.
+
+Contact
+---
+
+For issues and patches, please use the following contact methods
+
+- Google Groups: petercxy-projects@googlegroups.com ([web](https://groups.google.com/forum/?oldui=1#!forum/petercxy-projects))
+- Matrix Chat Room: #petercxy-projects:neo.angry.im
 
 Disclaimer
 ---
